@@ -8,6 +8,11 @@ if (!process.env.VERSION_FILE) {
   console.log("VERSION_FILE not set.. trying to detect which file we should get the initial version from"
   )
   process.chdir(process.env.GITHUB_WORKSPACE)
+
+
+  console.log(execSync('ls -al'));
+  console.log(execSync('pwd'));
+
   if(existsSync('./package.json')) {
     process.env.VERSION_FILE = './package.json'
   }
