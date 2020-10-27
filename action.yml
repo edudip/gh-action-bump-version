@@ -27,10 +27,6 @@ inputs:
     description: 'Avoid to add a TAG to the version update commit'
     default: 'false'
     required: false
-  PACKAGEJSON_DIR:
-    description: 'Custom dir to the package'
-    default: ''
-    required: false
   default:
     description: 'Set a default version bump to use'
     default: 'patch'
