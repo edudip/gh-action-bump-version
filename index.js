@@ -10,8 +10,8 @@ if (!process.env.VERSION_FILE) {
   process.chdir(process.env.GITHUB_WORKSPACE)
 
 
-  console.log(execSync('ls -al'));
-  console.log(execSync('pwd'));
+  console.log(execSync('ls -al').toString("utf8"));
+  console.log(execSync('pwd').toString("utf8"));
 
   if(existsSync('./package.json')) {
     process.env.VERSION_FILE = './package.json'
