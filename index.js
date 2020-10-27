@@ -1,15 +1,23 @@
 const { Toolkit } = require('actions-toolkit')
 const { execSync } = require('child_process')
+const { existsSync, writeFileSync } = require('fs')
+const { inc } = require('semver')
 
 // Change working directory if user defined PACKAGEJSON_DIR
-if (process.env.PACKAGEJSON_DIR) {
-  process.env.GITHUB_WORKSPACE = `${process.env.GITHUB_WORKSPACE}/${process.env.PACKAGEJSON_DIR}`
+if (!process.env.VERSION_FILE) {
   process.chdir(process.env.GITHUB_WORKSPACE)
+  if(existsSync('./package.json')) {
+    process.env.VERSION_FILE = './package.json'
+  }
+  // If composer.json is present, prefer it over package.json. API-Repository uses composer.json for versioning.
+  if(existsSync('./composer.json')) {
+    process.env.VERSION_FILE = './composer.json'
+  }
 }
 
 // Run your GitHub Action!
 Toolkit.run(async tools => {
-  const pkg = tools.getPackageJSON()
+  const pkg = JSON.parse(tools.getFile(process.env.VERSION_FILE))
   const event = tools.context.payload
 
   if (!event.commits) {
@@ -67,7 +75,7 @@ Toolkit.run(async tools => {
     await tools.runInWorkspace('git',
       ['config', 'user.name', `"${process.env.GITHUB_USER || 'Automated Version Bump'}"`])
     await tools.runInWorkspace('git',
-      ['config', 'user.email', `"${process.env.GITHUB_EMAIL || 'gh-action-bump-version@users.noreply.github.com'}"`])
+      ['config', 'user.email', `"${process.env.GITHUB_EMAIL || 'versionBot@edudip.com'}"`])
 
     let currentBranch = /refs\/[a-zA-Z]+\/(.*)/.exec(process.env.GITHUB_REF)[1]
     let isPullRequest = false
@@ -79,10 +87,10 @@ Toolkit.run(async tools => {
     console.log('currentBranch:', currentBranch)
     // do it in the current checked out github branch (DETACHED HEAD)
     // important for further usage of the package.json version
-    await tools.runInWorkspace('npm',
-      ['version', '--allow-same-version=true', '--git-tag-version=false', current])
     console.log('current:', current, '/', 'version:', version)
-    let newVersion = execSync(`npm version --git-tag-version=false ${version}`).toString().trim()
+    let newVersion = inc(current,version).toString().trim()
+    pkg.version = newVersion
+    writeFileSync(process.env.VERSION_FILE,JSON.stringify(pkg,null,2))
     await tools.runInWorkspace('git', ['commit', '-a', '-m', `ci: ${commitMessage} ${newVersion}`])
 
     // now go to the actual branch to perform the same versioning
@@ -91,15 +99,12 @@ Toolkit.run(async tools => {
       await tools.runInWorkspace('git', ['fetch'])
     }
     await tools.runInWorkspace('git', ['checkout', currentBranch])
-    await tools.runInWorkspace('npm',
-      ['version', '--allow-same-version=true', '--git-tag-version=false', current])
     console.log('current:', current, '/', 'version:', version)
-    newVersion = execSync(`npm version --git-tag-version=false ${version}`).toString().trim()
-    newVersion = `${process.env['INPUT_TAG-PREFIX']}${newVersion}`
-    console.log('new version:', newVersion)
+    newVersionWithPrefix = `${process.env['INPUT_TAG-PREFIX']}${newVersion}`
+    console.log('new version:', newVersionWithPrefix)
     try {
       // to support "actions/checkout@v1"
-      await tools.runInWorkspace('git', ['commit', '-a', '-m', `ci: ${commitMessage} ${newVersion}`])
+      await tools.runInWorkspace('git', ['commit', '-a', '-m', `ci: ${commitMessage} ${newVersionWithPrefix}`])
     } catch (e) {
       console.warn('git commit failed because you are using "actions/checkout@v2"; ' +
         'but that doesnt matter because you dont need that git commit, thats only for "actions/checkout@v1"')
@@ -107,7 +112,7 @@ Toolkit.run(async tools => {
 
     const remoteRepo = `https://${process.env.GITHUB_ACTOR}:${process.env.GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
     if (process.env['INPUT_SKIP-TAG'] !== 'true') {
-      await tools.runInWorkspace('git', ['tag', newVersion])
+      await tools.runInWorkspace('git', ['tag', newVersionWithPrefix])
       await tools.runInWorkspace('git', ['push', remoteRepo, '--follow-tags'])
       await tools.runInWorkspace('git', ['push', remoteRepo, '--tags'])
     } else {
