@@ -5,6 +5,8 @@ const { inc } = require('semver')
 
 // Change working directory if user defined PACKAGEJSON_DIR
 if (!process.env.VERSION_FILE) {
+  console.log("VERSION_FILE not set.. trying to detect which file we should get the initial version from"
+  )
   process.chdir(process.env.GITHUB_WORKSPACE)
   if(existsSync('./package.json')) {
     process.env.VERSION_FILE = './package.json'
@@ -13,6 +15,7 @@ if (!process.env.VERSION_FILE) {
   if(existsSync('./composer.json')) {
     process.env.VERSION_FILE = './composer.json'
   }
+  console.log(`Using ${process.env.VERSION_FILE}`);
 }
 
 // Run your GitHub Action!
